@@ -102,7 +102,7 @@ def ph2svg(env, start_response):
   
   try:
     ret = gen(url)
-    img = qrcode.make(url, border=0)
+    img = qrcode.make('http://ponyhead.com/deckbuilder?' + urlparse(url).query, border=0)
     out = io.BytesIO()
     img.save(out)
     out.seek(0)
@@ -110,7 +110,7 @@ def ph2svg(env, start_response):
     status = '200 OK'
     headers = [('Content-type', 'image/svg+xml')]
     start_response(status, headers)
-    return [data, ret, '<image transform="translate(50, 650)" width="130" height="130" xlink:href="data:image/png;base64,', b64, '" />', '</svg>']
+    return [data, ret, '<image transform="translate(450, 650)" width="130" height="130" xlink:href="data:image/png;base64,', b64, '" />', '</svg>']
   except:
     traceback.print_exc(20, env['wsgi.errors'])
     start_response('400 Bad Request', [('Content-type', 'text/plain')])
