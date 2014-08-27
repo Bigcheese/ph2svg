@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>PonyHead to SVG</title>
+<script>
+function dostuff() {
+  var str = document.getElementById('url').value;
+  window.location.href = 'pony' + str.substr(str.indexOf("?"));
+  return false;
+}
+</script>
+</head>
+<body>
+<form onsubmit="return dostuff();">
+  <p><label>PonyHead URL: <input id="url" style="width:700px;" /></label></p>
+  <p><button>Go</button></p>
+</form>
+</body>
+</html>
