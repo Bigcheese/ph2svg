@@ -1,4 +1,7 @@
-from urlparse import urlparse
+from . import cardsjson
+
+import asyncio
+from urllib.parse import urlparse
 import sys
 import re
 import json
@@ -11,11 +14,19 @@ import io
 import qrcode
 import base64
 
+carddb = cardsjson.CardsDB()
+
+loop = asyncio.get_event_loop()
+loop.run_until_complete(asyncio.wait([carddb.load()]))
+
+data = open('MLPCCGDecklist.svg', encoding='utf-8').read().encode('utf-8')
+noquery = open('noquery.html', encoding='utf-8').read().encode('utf-8')
+
 def fullName(card):
   return ', '.join([card['title'], card.get('subtitle', '')]).rstrip(', ')
   
 def text(x, y, size, t, rot = False):
-  return '<text transform="matrix({} {} {})" font-family="Calibri" font-size="{}">{}</text>'.format('0 -1 1 0' if rot else '1 0 0 1', x, y, size, escape(unicode(t).encode('UTF-8')))
+  return '<text transform="matrix({} {} {})" font-family="Calibri" font-size="{}">{}</text>'.format('0 -1 1 0' if rot else '1 0 0 1', x, y, size, escape(t))
 
 def genDrawDeck(deck):
   cardX = 100.5
@@ -54,10 +65,9 @@ def genProblemDeck(deck):
     count = count + 1
   return ret
 
-cardDb = json.load(open('cards.json'))
-cardIndex = {x['id']:x for x in cardDb}
-data = open('MLPCCGDecklist.svg').read()
-noquery = open('noquery.html').read()
+class UnknownCardError(Exception):
+  def __init__(self, card):
+    self.card = card
 
 def gen(url):
   o = urlparse(url)
@@ -65,13 +75,18 @@ def gen(url):
   code = d.get("v1code")
   if not code:
     return
-  cards = [re.search('(\w+)(\d+)x(\d+)', x).groups() for x in code.split("-")]
+  cards = [list(re.search('([a-zA-Z]{2})(F|PF)?(n?\d+)x(\d+)', x).groups()) for x in code.split("-")]
   mane = None
   drawDeck = []
   problemDeck = []
   for x in cards:
-    card = cardIndex[(x[0] + x[1]).lower()]
-    count = x[2]
+    try:
+      if x[2].startswith('n'):
+        x[2] = '-' + x[2][1:]
+      card = carddb.cardsByAllIDS[(x[1].lower() if x[1] else '') + x[2] + x[0].upper()]
+    except:
+      raise UnknownCardError(x[0] + x[1] + x[2])
+    count = x[3]
     if (card['type'] == 'Mane'):
       mane = card
     elif (card['type'] == 'Problem'):
@@ -110,15 +125,15 @@ def ph2svg(env, start_response):
     status = '200 OK'
     headers = [('Content-type', 'image/svg+xml')]
     start_response(status, headers)
-    return [data, ret, '<image transform="translate(450, 650)" width="130" height="130" xlink:href="data:image/png;base64,', b64, '" />', '</svg>']
+    return [data, ret.encode('utf-8'), b'<image transform="translate(450, 650)" width="130" height="130" xlink:href="data:image/png;base64,', b64, b'" />', b'</svg>']
   except:
     traceback.print_exc(20, env['wsgi.errors'])
     start_response('400 Bad Request', [('Content-type', 'text/plain')])
-    return ['Invalid request.']
+    return [b'Invalid request.']
   
 def main():
   httpd = make_server('', 8000, ph2svg)
-  print "Serving on port 8000..."
+  print("Serving on port 8000...")
   httpd.serve_forever()
 
 if __name__ == "__main__":
